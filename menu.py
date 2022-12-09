@@ -9,10 +9,11 @@ import os
 from typing import List, Dict
 
 import requests
-import data_base as db
 from bs4 import BeautifulSoup
-from lxml.html.clean import Cleaner
 from dotenv import load_dotenv
+from lxml.html.clean import Cleaner
+
+import data_base as db
 
 
 load_dotenv()
