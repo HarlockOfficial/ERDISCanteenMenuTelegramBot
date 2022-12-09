@@ -9,7 +9,7 @@ import os
 from typing import List, Dict
 
 import requests
-import pymongo
+import data_base as db
 from bs4 import BeautifulSoup
 from lxml.html.clean import Cleaner
 from dotenv import load_dotenv
@@ -246,12 +246,12 @@ def save_menu_to_db(menu: Dict[str, Dict[str, List[str]]], time: Dict[str, str],
     """
     Saves the menu and timetable to the database
     """
-    mongo_client = pymongo.MongoClient(os.getenv('DB_CONNECTION_STRING'))
-    data_base = mongo_client[os.getenv('DB_NAME')]
-    collection = data_base[os.getenv('DB_COLLECTION')]
+    mongo_client = db.open_connection()
+    data_base = db.get_data_base(mongo_client=mongo_client)
+    collection = data_base[os.getenv('DB_MENU_COLLECTION')]
     collection.find_one_and_delete({'canteen': canteen.value})
     collection.insert_one({'canteen': canteen.value, 'menu': menu, 'time': time})
-    mongo_client.close()
+    db.close_connection(mongo_client)
 
 
 def main():
