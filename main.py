@@ -5,10 +5,17 @@ TODO: Add description
 """
 import datetime
 import enum
-import requests
+import os
 from typing import List, Dict
+
+import requests
+import pymongo
 from bs4 import BeautifulSoup
 from lxml.html.clean import Cleaner
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 class Canteen(enum.Enum):
@@ -47,7 +54,10 @@ def build_daily_url(date: datetime.date, canteen: Canteen):
         "/Menu_Del_Giorno_" + str(date.year) + "_" + month + "_" + day + "_" + canteen + ".html"
 
 
-def sanitize(dirty_html):
+def sanitise(dirty_html):
+    """
+    Sanitises the html of the daily menu
+    """
     cleaner = Cleaner(page_structure=True,
                   meta=True,
                   embedded=True,
@@ -70,16 +80,10 @@ def sanitize(dirty_html):
     return cleaner.clean_html(dirty_html)
 
 
-def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
+def get_daily_menu(menu_table) -> Dict[str, Dict[str, List[str]]]:
     """
-    Parses the html of the daily menu and returns a dictionary with the menu
+    Gets the daily menu from the html of the daily menu
     """
-    # TODO clean the code
-    html_content = sanitize(html)
-    soup = BeautifulSoup(html_content, 'html.parser')
-    # time_table = soup.select("table#menu")[0]
-    
-    menu_table = soup.select('table#menu')[1]
     full_turn_list = menu_table.select('tr>td')
     full_turn_list = list(filter(lambda x: x.text in ['Pranzo', 'Cena'], full_turn_list))
 
@@ -101,7 +105,7 @@ def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
     lunch_turn = list(filter(lambda x: x.text in ['Pranzo'], full_turn_list))[0]
     selector = 'tr:nth-child(-n+ ' + lunch_turn['rowspan'] + ')'
     lunch_turn_rows = menu_table.select(selector)[1:]
-    
+
     for row in lunch_turn_rows:
         lst = list(filter(lambda x: x.text in ['Primo'], row.select('td[rowspan]')))
         if len(lst)>0:
@@ -117,6 +121,7 @@ def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
         lst = list(filter(lambda x: x.text in ['Secondo'], row.select('td[rowspan]')))
         if len(lst)>0:
             second_turn = lst[0]
+            break
 
     selector = 'tr:nth-child(n+ ' + str(int(first_turn['rowspan'])+1) + '):nth-child(-n+' + str(int(first_turn['rowspan']) + int(second_turn['rowspan'])+1) + ')'
     turn_rows = menu_table.select(selector)[1:]
@@ -127,6 +132,7 @@ def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
         lst = list(filter(lambda x: x.text in ['Contorno'], row.select('td[rowspan]')))
         if len(lst)>0:
             third_turn = lst[0]
+            break
 
     selector = 'tr:nth-child(n+ ' + str(int(first_turn['rowspan']) + int(second_turn['rowspan']) + 1) + \
         '):nth-child(-n+' + str(int(first_turn['rowspan']) + int(second_turn['rowspan']) + int(third_turn['rowspan'])+1) + ')'
@@ -139,8 +145,8 @@ def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
     turn_rows = menu_table.select(selector)[1:]
     for row in turn_rows:
         out['Pranzo']['Frutta'].append(list(filter(lambda x: x.text != "Frutta", row.select('td:not([rowspan])')))[0].text)
-    
-    
+
+
     dinner_turn = list(filter(lambda x: x.text in ['Cena'], full_turn_list))[0]
     selector = 'tr:nth-child(n+ ' + str(int(lunch_turn['rowspan']) + 2) + '):nth-child(-n+' + str(int(lunch_turn['rowspan']) + int(dinner_turn['rowspan']) + 1) + ')'
     dinner_turn_rows = menu_table.select(selector)
@@ -160,6 +166,7 @@ def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
         lst = list(filter(lambda x: x.text in ['Secondo'], row.select('td[rowspan]')))
         if len(lst)>0:
             second_turn = lst[0]
+            break
 
     selector = 'tr:nth-child(n+ ' + str(int(lunch_turn['rowspan']) + int(first_turn['rowspan']) + 2) + \
         '):nth-child(-n+ ' + str( int(lunch_turn['rowspan']) + int(first_turn['rowspan']) + int(second_turn['rowspan']) + 1) + ')'
@@ -171,6 +178,7 @@ def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
         lst = list(filter(lambda x: x.text in ['Contorno'], row.select('td[rowspan]')))
         if len(lst)>0:
             third_turn = lst[0]
+            break
 
     selector = 'tr:nth-child(n+ ' + str(int(lunch_turn['rowspan'])+int(first_turn['rowspan']) + int(second_turn['rowspan']) + 2) + \
         '):nth-child(-n+ ' + str(int(lunch_turn['rowspan']) + int(first_turn['rowspan']) + int(second_turn['rowspan'])+ int(third_turn['rowspan']) + 1) + ')'
@@ -181,12 +189,49 @@ def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
     selector = 'tr:nth-child(n+ ' + str(int(lunch_turn['rowspan']) + int(first_turn['rowspan']) + int(second_turn['rowspan']) + int(third_turn['rowspan']) + 2) + \
         '):nth-child(-n+' + str(int(lunch_turn['rowspan']) + int(dinner_turn['rowspan'])+1) + ')'
     turn_rows = menu_table.select(selector)
-    
+
     for row in turn_rows:
         out['Cena']['Frutta'].append(list(filter(lambda x: x.text != "Frutta", row.select('td:not([rowspan])')))[0].text)
-    
+
     return out
-    
+
+
+def get_daily_time(time_table) -> Dict[str, str]:
+    """
+    Gets the time of the daily menu
+    """
+    out = {}
+    time_table = time_table.select('tr')
+    for row in time_table:
+        out[row.select('td')[0].text] = row.select('td')[1].text
+    return out
+
+
+def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
+    """
+    Parses the html of the daily menu and returns a dictionary with the menu
+    """
+    html_content = sanitise(html)
+    soup = BeautifulSoup(html_content, 'html.parser')
+    time_table = soup.select("table#menu")[0]
+    menu_table = soup.select('table#menu')[1]
+
+    daily_menu = get_daily_menu(menu_table)
+    daily_time = get_daily_time(time_table)
+    return daily_menu, daily_time
+
+
+def save_menu_to_db(menu: Dict[str, Dict[str, List[str]]], time: Dict[str, str], canteen: Canteen):
+    """
+    Saves the menu and timetable to the database
+    """
+    mongo_client = pymongo.MongoClient(os.getenv('DB_CONNECTION_STRING'))
+    data_base = mongo_client[os.getenv('DB_NAME')]
+    collection = data_base[os.getenv('DB_COLLECTION')]
+    collection.find_one_and_delete({'canteen': canteen.value})
+    collection.insert_one({'canteen': canteen.value, 'menu': menu, 'time': time})
+    mongo_client.close()
+
 
 def main():
     """
@@ -197,11 +242,11 @@ def main():
         headers = {'Accept-Encoding': 'identity'}
         request = requests.get(url, headers=headers, timeout=60)
         if request.status_code == 200:
-            menu = parse_menu(request.content.decode('utf-8'))
-            save_to_db(menu, canteen)
+            menu, time = parse_menu(request.content.decode('utf-8'))
+            save_menu_to_db(menu, time, canteen)
         else:
             print("Error: " + str(request.status_code) + " for " + canteen)
 
-         
+
 if __name__ == '__main__':
     main()
