@@ -217,7 +217,7 @@ def get_daily_time(time_table) -> Dict[str, str]:
         data = row.select('td')
         out[data[0].text]['OpenTime'] = data[1].text
         out[data[0].text]['CloseTime'] = data[2].text
-        if(len(data)>3):
+        if len(data)>3:
             out[data[0].text]['IsOpen'] = data[3].text == 'NO'
             if hasattr(data[3], 'rowspan') and int(data[3]['rowspan']) == 2 and index<len(time_table)-1:
                 tmp_data = time_table[index+1].select('td')
@@ -232,7 +232,7 @@ def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
     html_content = sanitise(html)
     soup = BeautifulSoup(html_content, 'html.parser')
     tables = soup.select('table#menu')
-    if(len(tables) < 2):
+    if len(tables) < 2:
         return None, None
     time_table = tables[0]
     menu_table = tables[1]
