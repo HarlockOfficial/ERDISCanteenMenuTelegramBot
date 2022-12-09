@@ -249,14 +249,14 @@ def save_menu_to_db(menu: Dict[str, Dict[str, List[str]]], time: Dict[str, str],
     mongo_client = db.open_connection()
     data_base = db.get_data_base(mongo_client=mongo_client)
     collection = data_base[os.getenv('DB_MENU_COLLECTION')]
-    collection.find_one_and_delete({'canteen': canteen.value})
-    collection.insert_one({'canteen': canteen.value, 'menu': menu, 'time': time})
+    collection.find_one_and_delete({'canteen': canteen.value.lower()})
+    collection.insert_one({'canteen': canteen.value.lower(), 'menu': menu, 'time': time, 'date': datetime.date.today().isoformat()})
     db.close_connection(mongo_client)
 
 
-def main():
+def init_menu():
     """
-    Main function of the project
+    Module main function, does all the work
     """
     for canteen in Canteen:
         url = build_daily_url(datetime.date.today(), canteen)
@@ -280,6 +280,3 @@ def main():
 
         else:
             print("Error: " + str(request.status_code) + " for " + canteen)
-
-if __name__ == '__main__':
-    main()
