@@ -200,10 +200,28 @@ def get_daily_time(time_table) -> Dict[str, str]:
     """
     Gets the time of the daily menu
     """
-    out = {}
-    time_table = time_table.select('tr')
-    for row in time_table:
-        out[row.select('td')[0].text] = row.select('td')[1].text
+    out = {
+        'Pranzo': {
+            'IsOpen': False,
+            'OpenTime': '12:00',
+            'CloseTime': '14:00'
+        },
+        'Cena': {
+            'IsOpen': False,
+            'OpenTime': '19:00',
+            'CloseTime': '21:00'
+        }
+    }
+    time_table = time_table.select('tr')[1:]
+    for index, row in enumerate(time_table):
+        data = row.select('td')
+        out[data[0].text]['OpenTime'] = data[1].text
+        out[data[0].text]['CloseTime'] = data[2].text
+        if(len(data)>3):
+            out[data[0].text]['IsOpen'] = data[3].text == 'NO'
+            if hasattr(data[3], 'rowspan') and int(data[3]['rowspan']) == 2 and index<len(time_table)-1:
+                tmp_data = time_table[index+1].select('td')
+                out[tmp_data[0].text]['IsOpen'] = data[3].text == 'NO'
     return out
 
 
@@ -213,11 +231,14 @@ def parse_menu(html) -> Dict[str, Dict[str, List[str]]]:
     """
     html_content = sanitise(html)
     soup = BeautifulSoup(html_content, 'html.parser')
-    time_table = soup.select("table#menu")[0]
-    menu_table = soup.select('table#menu')[1]
+    tables = soup.select('table#menu')
+    if(len(tables) < 2):
+        return None, None
+    time_table = tables[0]
+    menu_table = tables[1]
 
-    daily_menu = get_daily_menu(menu_table)
     daily_time = get_daily_time(time_table)
+    daily_menu = get_daily_menu(menu_table)
     return daily_menu, daily_time
 
 
@@ -243,10 +264,22 @@ def main():
         request = requests.get(url, headers=headers, timeout=60)
         if request.status_code == 200:
             menu, time = parse_menu(request.content.decode('utf-8'))
-            save_menu_to_db(menu, time, canteen)
+            if menu is not None and time is not None:
+                # save_menu_to_db(menu, time, canteen)
+                pass
+            else:
+                time = {
+                    'Pranzo':{
+                        'IsOpen': False,
+                    },
+                    'Cena':{
+                        'IsOpen': False,
+                    }
+                }
+                # save_menu_to_db(menu, time, canteen)
+
         else:
             print("Error: " + str(request.status_code) + " for " + canteen)
-
 
 if __name__ == '__main__':
     main()
