@@ -4,11 +4,11 @@ Telegram bot
 import os
 import datetime
 
-import data_base as db
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, ContextTypes
 from dotenv import load_dotenv
 
+import data_base as db
 
 load_dotenv()
 
@@ -17,7 +17,7 @@ updater = Updater(token=os.getenv('TELEGRAM_BOT_TOKEN'), use_context=True)
 dispatcher = updater.dispatcher
 
 
-async def save_user(update: Update, context: ContextTypes):
+async def save_user(update: Update, _: ContextTypes):
     """
     Save user to database
     """
@@ -39,7 +39,7 @@ async def save_user(update: Update, context: ContextTypes):
     db.close_connection(mongo_client)
 
 
-async def subscribe(update: Update, context: ContextTypes):
+async def subscribe(update: Update, _: ContextTypes):
     """
     Subscribe user to daily updates
     """
@@ -51,7 +51,7 @@ async def subscribe(update: Update, context: ContextTypes):
     db.close_connection(mongo_client)
 
 
-async def unsubscribe(update: Update, context: ContextTypes):
+async def unsubscribe(update: Update, _: ContextTypes):
     """
     Unsubscribe user from daily updates
     """
@@ -63,7 +63,7 @@ async def unsubscribe(update: Update, context: ContextTypes):
     db.close_connection(mongo_client)
 
 
-async def delete_user(update: Update, context: ContextTypes):
+async def delete_user(update: Update, _: ContextTypes):
     """
     Delete user from database
     """
