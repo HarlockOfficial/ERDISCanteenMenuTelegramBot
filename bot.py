@@ -19,7 +19,7 @@ updater = Updater(token=os.getenv('TELEGRAM_BOT_TOKEN'), use_context=True)
 dispatcher = updater.dispatcher
 
 
-async def save_user(update: Update, _: ContextTypes):
+def save_user(update: Update, _: ContextTypes):
     """
     Save user to database
     """
@@ -42,7 +42,7 @@ async def save_user(update: Update, _: ContextTypes):
     db.close_connection(mongo_client)
 
 
-async def subscribe(update: Update, _: ContextTypes):
+def subscribe(update: Update, _: ContextTypes):
     """
     Subscribe user to daily updates
     """
@@ -54,7 +54,7 @@ async def subscribe(update: Update, _: ContextTypes):
     db.close_connection(mongo_client)
 
 
-async def unsubscribe(update: Update, _: ContextTypes):
+def unsubscribe(update: Update, _: ContextTypes):
     """
     Unsubscribe user from daily updates
     """
@@ -66,7 +66,7 @@ async def unsubscribe(update: Update, _: ContextTypes):
     db.close_connection(mongo_client)
 
 
-async def delete_user(update: Update, _: ContextTypes):
+def delete_user(update: Update, _: ContextTypes):
     """
     Delete user from database
     """
@@ -85,7 +85,7 @@ def get_today_menu():
     mongo_client = db.open_connection()
     data_base = db.get_data_base(mongo_client)
     collection = data_base[os.getenv('DB_MENU_COLLECTION')]
-    menu = collection.find({'date': datetime.date.today()})
+    menu = list(collection.find({'date': datetime.date.today().isoformat()}))
     db.close_connection(mongo_client)
     if len(menu) == 0:
         menu_module.init_menu()
@@ -99,7 +99,7 @@ def get_today_menu_string(menu = None, canteen_names: List[str] = None) -> str:
     """
     if menu is None:
         menu = get_today_menu()
-    if canteen_names is not None:
+    if canteen_names is not None and len(canteen_names) > 0:
         menu = filter(lambda x: x['canteen'].lower() in [x.lower() for x in canteen_names], menu)
     text = 'Today\'s menu:\n'
     for item in menu:
@@ -115,7 +115,7 @@ def get_today_menu_string(menu = None, canteen_names: List[str] = None) -> str:
     return text
 
 
-async def today_menu(update: Update, _: ContextTypes):
+def today_menu(update: Update, _: ContextTypes):
     """
     Send today's menu
     """
@@ -124,21 +124,23 @@ async def today_menu(update: Update, _: ContextTypes):
     update.message.reply_text(text)
 
 
-async def send_daily_updates(context: ContextTypes):
+def send_daily_updates(context: ContextTypes):
     """
     Send daily updates to users
     """
+    print('Start sending daily updates')
     mongo_client = db.open_connection()
     data_base = db.get_data_base(mongo_client)
     collection = data_base[os.getenv('DB_USER_COLLECTION')]
-    users = collection.find({'send_daily_updates': True})
+    users = list(collection.find({'send_daily_updates': True}))
     db.close_connection(mongo_client)
     for user in users:
         menu = get_today_menu_string(canteen_names=user['canteen_list'])
         context.bot.send_message(chat_id=user['chat_id'], text=menu)
+    print('Completed sending daily updates sent')
 
 
-async def get_user_canteen_list(update: Update, _: ContextTypes):
+def get_user_canteen_list(update: Update, _: ContextTypes):
     """
     Get user's canteen list
     """
@@ -150,7 +152,7 @@ async def get_user_canteen_list(update: Update, _: ContextTypes):
     update.message.reply_text(f'Your canteen list is: {user["canteen_list"]}')
 
 
-async def add_canteen_to_user_list(update: Update, _: ContextTypes):
+def add_canteen_to_user_list(update: Update, _: ContextTypes):
     """
     Add canteen to user's canteen list
     """
@@ -160,13 +162,14 @@ async def add_canteen_to_user_list(update: Update, _: ContextTypes):
     user = collection.find_one({'id': update.effective_user.id})
     canteen_list = user['canteen_list']
     msg_content = update.message.text.split(' ')
-    canteen_list.extend(msg_content[1:])
+    msg_content = list(filter(lambda x: x.lower() in [canteen.value.lower() for canteen in menu_module.Canteen], [x.lower() for x in msg_content[1:]]))
+    canteen_list.extend(msg_content)
     collection.update_one({'id': update.effective_user.id}, {'$set': {'canteen_list': canteen_list}})
     db.close_connection(mongo_client)
     update.message.reply_text(f'Your canteen list is: {canteen_list}')
 
 
-async def remove_canteen_from_user_list(update: Update, _: ContextTypes):
+def remove_canteen_from_user_list(update: Update, _: ContextTypes):
     """
     Remove canteen from user's canteen list
     """
@@ -176,7 +179,7 @@ async def remove_canteen_from_user_list(update: Update, _: ContextTypes):
     user = collection.find_one({'id': update.effective_user.id})
     canteen_list = user['canteen_list']
     msg_content = update.message.text.split(' ')
-    canteen_list = list(filter(lambda x: x not in msg_content[1:], canteen_list))
+    canteen_list = list(filter(lambda x: x.lower() not in [canteen.lower() for canteen in msg_content[1:]], canteen_list))
     collection.update_one({'id': update.effective_user.id}, {'$set': {'canteen_list': canteen_list}})
     db.close_connection(mongo_client)
     update.message.reply_text(f'Your canteen list is: {canteen_list}')
@@ -189,20 +192,23 @@ def get_canteen(canteen_name: str) -> dict:
     mongo_client = db.open_connection()
     data_base = db.get_data_base(mongo_client)
     collection = data_base[os.getenv('DB_MENU_COLLECTION')]
-    canteen = collection.find({'canteen': canteen_name.lower()})
+    canteen = collection.find_one({'canteen': canteen_name.lower()})
     db.close_connection(mongo_client)
     return canteen
 
 
-async def canteen_time(update: Update, _: ContextTypes):
+def canteen_time(update: Update, _: ContextTypes):
     """
     Get canteen time
     """
-    msg_content = update.message.text.split(' ')
+    try:
+        msg_content = update.message.text.split(' ')
+    except AttributeError:
+        return
     canteen_name_list = msg_content[1:]
     for canteen in canteen_name_list:
         canteen = get_canteen(canteen)
-        text = f'{canteen}:\n'
+        text = f'{canteen["canteen"]}:\n'
         if canteen['time']['Pranzo']['IsOpen']:
             text += f'\tLunch: {canteen["time"]["Pranzo"]["OpenTime"]} - {canteen["time"]["Pranzo"]["CloseTime"]}\n'
         else:
@@ -214,7 +220,7 @@ async def canteen_time(update: Update, _: ContextTypes):
     update.message.reply_text(text)
 
 
-async def available_canteen_list(update: Update, _: ContextTypes):
+def available_canteen_list(update: Update, _: ContextTypes):
     """
     Get canteen list
     """
@@ -224,14 +230,14 @@ async def available_canteen_list(update: Update, _: ContextTypes):
     update.message.reply_text(text)
 
 
-async def bot_credits(update: Update, _: ContextTypes):
+def bot_credits(update: Update, _: ContextTypes):
     """
     Send credits message
     """
     text = 'Credits:\n'
     text += 'The full source code of this bot is available at:\n'
-    text += 'https://github.com/HarlockOfficial/ERDISCanteenMenuTelegramBot'
-    text += 'Contributions are well accepted'
+    text += 'https://github.com/HarlockOfficial/ERDISCanteenMenuTelegramBot\n'
+    text += 'Contributions are well accepted.\n'
     text += 'This bot was created for fun by HarlockOfficial\n'
     text += 'GitHub: https://github.com/HarlockOfficial\n'
     text += 'Telegram: @HarlockOfficial\n'
@@ -241,7 +247,7 @@ async def bot_credits(update: Update, _: ContextTypes):
     update.message.reply_text(text)
 
 
-async def bot_help(update: Update, _: ContextTypes):
+def bot_help(update: Update, _: ContextTypes):
     """
     Send help message
     """
@@ -252,8 +258,8 @@ async def bot_help(update: Update, _: ContextTypes):
     text += '/stop - Stop the bot\n'
     text += '/menu - Get today\'s menu\n'
     text += '/my_canteen_list - Get your canteen list\n'
-    text += '/add_canteen - Add canteen to your canteen list\n'
-    text += '/remove_canteen - Remove canteen from your canteen list\n'
+    text += '/add_canteen - Add a canteen to your canteen list\n'
+    text += '/remove_canteen - Remove a canteen from your canteen list\n'
     text += '/canteen_time - Get specified canteen(s) time\n'
     text += '/available_canteen_list - Get the names of available canteens\n'
     text += '/credits - Get credits\n'
@@ -291,10 +297,13 @@ def main():
     """
     Main function
     """
+    print('Starting bot...')
     set_handlers()
     j = updater.job_queue
     j.run_daily(send_daily_updates, time=datetime.time(hour=9, minute=0, second=0))
     updater.start_polling()
+    print('Bot started')
+    updater.idle()
 
 
 if __name__ == '__main__':

@@ -116,7 +116,7 @@ def get_daily_menu(menu_table) -> Dict[str, Dict[str, List[str]]]:
     selector = 'tr:nth-child(-n+ ' + str(int(first_turn['rowspan'])+1) + ')'
     turn_rows = menu_table.select(selector)[1:]
     for row in turn_rows:
-        out['Pranzo']['Primo'].append(row.select('td:not([rowspan])')[0].text)
+        out['Pranzo']['Primo'].append(row.select('td:not([rowspan])')[0].text.lower())
 
     for row in lunch_turn_rows:
         lst = list(filter(lambda x: x.text in ['Secondo'], row.select('td[rowspan]')))
@@ -127,7 +127,7 @@ def get_daily_menu(menu_table) -> Dict[str, Dict[str, List[str]]]:
     selector = 'tr:nth-child(n+ ' + str(int(first_turn['rowspan'])+1) + '):nth-child(-n+' + str(int(first_turn['rowspan']) + int(second_turn['rowspan'])+1) + ')'
     turn_rows = menu_table.select(selector)[1:]
     for row in turn_rows:
-        out['Pranzo']['Secondo'].append(row.select('td:not([rowspan])')[0].text)
+        out['Pranzo']['Secondo'].append(row.select('td:not([rowspan])')[0].text.lower())
 
     for row in lunch_turn_rows:
         lst = list(filter(lambda x: x.text in ['Contorno'], row.select('td[rowspan]')))
@@ -139,13 +139,13 @@ def get_daily_menu(menu_table) -> Dict[str, Dict[str, List[str]]]:
         '):nth-child(-n+' + str(int(first_turn['rowspan']) + int(second_turn['rowspan']) + int(third_turn['rowspan'])+1) + ')'
     turn_rows = menu_table.select(selector)[1:]
     for row in turn_rows:
-        out['Pranzo']['Contorno'].append(row.select('td:not([rowspan])')[0].text)
+        out['Pranzo']['Contorno'].append(row.select('td:not([rowspan])')[0].text.lower())
 
     selector = 'tr:nth-child(n+ ' + str(int(first_turn['rowspan']) + int(second_turn['rowspan']) + int(third_turn['rowspan']) + 1) + \
         '):nth-child(-n+' + str(int(lunch_turn['rowspan'])+1) + ')'
     turn_rows = menu_table.select(selector)[1:]
     for row in turn_rows:
-        out['Pranzo']['Frutta'].append(list(filter(lambda x: x.text != "Frutta", row.select('td:not([rowspan])')))[0].text)
+        out['Pranzo']['Frutta'].append(list(filter(lambda x: x.text != "Frutta", row.select('td:not([rowspan])')))[0].text.lower())
 
 
     dinner_turn = list(filter(lambda x: x.text in ['Cena'], full_turn_list))[0]
@@ -161,7 +161,7 @@ def get_daily_menu(menu_table) -> Dict[str, Dict[str, List[str]]]:
         '):nth-child(-n+ ' + str(int(lunch_turn['rowspan']) + int(first_turn['rowspan'])+1) + ')'
     turn_rows = menu_table.select(selector)[1:]
     for row in turn_rows:
-        out['Cena']['Primo'].append(row.select('td:not([rowspan])')[0].text)
+        out['Cena']['Primo'].append(row.select('td:not([rowspan])')[0].text.lower())
 
     for row in dinner_turn_rows:
         lst = list(filter(lambda x: x.text in ['Secondo'], row.select('td[rowspan]')))
@@ -173,7 +173,7 @@ def get_daily_menu(menu_table) -> Dict[str, Dict[str, List[str]]]:
         '):nth-child(-n+ ' + str( int(lunch_turn['rowspan']) + int(first_turn['rowspan']) + int(second_turn['rowspan']) + 1) + ')'
     turn_rows = menu_table.select(selector)[1:]
     for row in turn_rows:
-        out['Cena']['Secondo'].append(row.select('td:not([rowspan])')[0].text)
+        out['Cena']['Secondo'].append(row.select('td:not([rowspan])')[0].text.lower())
 
     for row in dinner_turn_rows:
         lst = list(filter(lambda x: x.text in ['Contorno'], row.select('td[rowspan]')))
@@ -185,14 +185,14 @@ def get_daily_menu(menu_table) -> Dict[str, Dict[str, List[str]]]:
         '):nth-child(-n+ ' + str(int(lunch_turn['rowspan']) + int(first_turn['rowspan']) + int(second_turn['rowspan'])+ int(third_turn['rowspan']) + 1) + ')'
     turn_rows = menu_table.select(selector)[1:]
     for row in turn_rows:
-        out['Cena']['Contorno'].append(row.select('td:not([rowspan])')[0].text)
+        out['Cena']['Contorno'].append(row.select('td:not([rowspan])')[0].text.lower())
 
     selector = 'tr:nth-child(n+ ' + str(int(lunch_turn['rowspan']) + int(first_turn['rowspan']) + int(second_turn['rowspan']) + int(third_turn['rowspan']) + 2) + \
         '):nth-child(-n+' + str(int(lunch_turn['rowspan']) + int(dinner_turn['rowspan'])+1) + ')'
     turn_rows = menu_table.select(selector)
 
     for row in turn_rows:
-        out['Cena']['Frutta'].append(list(filter(lambda x: x.text != "Frutta", row.select('td:not([rowspan])')))[0].text)
+        out['Cena']['Frutta'].append(list(filter(lambda x: x.text != "Frutta", row.select('td:not([rowspan])')))[0].text.lower())
 
     return out
 
@@ -220,9 +220,12 @@ def get_daily_time(time_table) -> Dict[str, str]:
         out[data[0].text]['CloseTime'] = data[2].text
         if len(data)>3:
             out[data[0].text]['IsOpen'] = data[3].text == 'NO'
-            if hasattr(data[3], 'rowspan') and int(data[3]['rowspan']) == 2 and index<len(time_table)-1:
-                tmp_data = time_table[index+1].select('td')
-                out[tmp_data[0].text]['IsOpen'] = data[3].text == 'NO'
+            try:
+                if int(data[3]['rowspan']) == 2 and index<len(time_table)-1:
+                    tmp_data = time_table[index+1].select('td')
+                    out[tmp_data[0].text]['IsOpen'] = data[3].text == 'NO'
+            except KeyError:
+                pass
     return out
 
 
@@ -264,20 +267,38 @@ def init_menu():
         headers = {'Accept-Encoding': 'identity'}
         request = requests.get(url, headers=headers, timeout=60)
         if request.status_code == 200:
+            print("Canteen: ", canteen)
             menu, time = parse_menu(request.content.decode('utf-8'))
             if menu is not None and time is not None:
-                # save_menu_to_db(menu, time, canteen)
-                pass
+                save_menu_to_db(menu, time, canteen)
             else:
+                menu = {
+                    'Pranzo':{
+                        'Primo':[],
+                        'Secondo':[],
+                        'Contorno':[],
+                        'Frutta':[]
+                    }, 
+                    'Cena':{
+                        'Primo':[],
+                        'Secondo':[],
+                        'Contorno':[],
+                        'Frutta':[]
+                    }
+                }
                 time = {
                     'Pranzo':{
                         'IsOpen': False,
+                        'OpenTime': '-',
+                        'CloseTime': '-'
                     },
                     'Cena':{
                         'IsOpen': False,
+                        'OpenTime': '-',
+                        'CloseTime': '-'
                     }
                 }
-                # save_menu_to_db(menu, time, canteen)
+                save_menu_to_db(menu, time, canteen)
 
         else:
             print("Error: " + str(request.status_code) + " for " + canteen)
