@@ -3,6 +3,7 @@ Telegram bot
 """
 import os
 import datetime
+import logging
 from typing import List
 
 from telegram import Update
@@ -13,6 +14,10 @@ import data_base as db
 import menu as menu_module
 
 load_dotenv()
+
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 updater = Updater(token=os.getenv('TELEGRAM_BOT_TOKEN'), use_context=True)
@@ -128,7 +133,7 @@ def send_daily_updates(context: ContextTypes):
     """
     Send daily updates to users
     """
-    print('Start sending daily updates')
+    logger.info('Start sending daily updates')
     mongo_client = db.open_connection()
     data_base = db.get_data_base(mongo_client)
     collection = data_base[os.getenv('DB_USER_COLLECTION')]
@@ -137,7 +142,7 @@ def send_daily_updates(context: ContextTypes):
     for user in users:
         menu = get_today_menu_string(canteen_names=user['canteen_list'])
         context.bot.send_message(chat_id=user['chat_id'], text=menu)
-    print('Completed sending daily updates sent')
+    logger.info('Completed sending daily updates sent')
 
 
 def get_user_canteen_list(update: Update, _: ContextTypes):
@@ -297,12 +302,12 @@ def main():
     """
     Main function
     """
-    print('Starting bot...')
+    logger.info('Starting bot...')
     set_handlers()
     j = updater.job_queue
     j.run_daily(send_daily_updates, time=datetime.time(hour=9, minute=0, second=0))
     updater.start_polling()
-    print('Bot started')
+    logger.info('Bot started')
     updater.idle()
 
 
