@@ -339,15 +339,15 @@ def bot_help(update: Update, _: ContextTypes):
     text += '/unsubscribe - Unsubscribe from daily updates\n'
     text += '/stop - Stop the bot\n'
     text += '/menu - Get today\'s menu\n'
-    text += '/my_canteen_list - Get your canteen list\n'
-    text += '/add_canteen - Add a canteen to your canteen list\n'
-    text += '/remove_canteen - Remove a canteen from your canteen list\n'
+    text += '/favourite_canteen_list - Get your canteen list\n'
+    text += '/save_canteen_to_favourite - Add a canteen to your favourite canteen list\n'
+    text += '/remove_canteen_from_favourite - Remove a canteen from your favourite canteen list\n'
     text += '/canteen_time - Get specified canteen(s) time\n'
-    text += '/my_canteen_menu - Get your canteen(s) daily menu\n'
-    text += '/my_canteen_time - Get your canteen(s) time\n'
+    text += '/favourite_canteen_menu - Get your canteen(s) daily menu\n'
+    text += '/favourite_canteen_time - Get your canteen(s) time\n'
     text += '/available_canteen_list - Get the names of available canteens\n'
     text += '/credits - Get credits\n'
-    text += '/help - Get help\n'
+    text += '/help - Shows this message\n'
     text += 'Example:\n'
     text += '\tThe following command will send you today\'s menu for canteen1 and canteen2:\n'
     text += '\t\t/menu canteen1 canteen2\n'
@@ -378,12 +378,12 @@ def set_handlers():
     dispatcher.add_handler(CommandHandler("unsubscribe", unsubscribe))
     dispatcher.add_handler(CommandHandler("stop", delete_user))
     dispatcher.add_handler(CommandHandler("menu", today_menu))
-    dispatcher.add_handler(CommandHandler("my_canteen_list", get_user_canteen_list))
-    dispatcher.add_handler(CommandHandler("add_canteen", add_canteen_to_user_list))
-    dispatcher.add_handler(CommandHandler("remove_canteen", remove_canteen_from_user_list))
+    dispatcher.add_handler(CommandHandler("favourite_canteen_list", get_user_canteen_list))
+    dispatcher.add_handler(CommandHandler("save_canteen_to_favourite", add_canteen_to_user_list))
+    dispatcher.add_handler(CommandHandler("remove_canteen_from_favourite", remove_canteen_from_user_list))
     dispatcher.add_handler(CommandHandler("canteen_time", canteen_time))
-    dispatcher.add_handler(CommandHandler("my_canteen_menu", my_canteens_menu))
-    dispatcher.add_handler(CommandHandler("my_canteen_time", my_canteens_time))  
+    dispatcher.add_handler(CommandHandler("favourite_canteen_menu", my_canteens_menu))
+    dispatcher.add_handler(CommandHandler("favourite_canteen_time", my_canteens_time))
     dispatcher.add_handler(CommandHandler("available_canteen_list", available_canteen_list))
     dispatcher.add_handler(CommandHandler("credits", bot_credits))
     dispatcher.add_handler(CommandHandler("help", bot_help))
@@ -398,7 +398,8 @@ def main():
     logger.info('Starting bot...')
     set_handlers()
     j = updater.job_queue
-    j.run_daily(send_daily_updates, time=datetime.time(hour=9, minute=0, second=0))
+    # server is 1 hh behind, so updates are sent at 9:00 am
+    j.run_daily(send_daily_updates, time=datetime.time(hour=8, minute=0, second=0))
     updater.start_polling()
     logger.info('Bot started')
     updater.idle()
