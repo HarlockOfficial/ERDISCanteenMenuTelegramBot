@@ -159,17 +159,22 @@ def send_daily_updates(context: ContextTypes):
     logger.info('Completed sending daily updates')
 
 
+def get_user_canteen_list_from_db(user_id):
+    mongo_client = db.open_connection()
+    data_base = db.get_data_base(mongo_client)
+    collection = data_base[os.getenv('DB_USER_COLLECTION')]
+    user = collection.find_one({'id': user_id})
+    db.close_connection(mongo_client)
+    return user["canteen_list"]
+
+
 def get_user_canteen_list(update: Update, _: ContextTypes):
     """
     Get user's canteen list
     """
     logger.info(f"Getting canteen list for user: {update.effective_user.username}")
-    mongo_client = db.open_connection()
-    data_base = db.get_data_base(mongo_client)
-    collection = data_base[os.getenv('DB_USER_COLLECTION')]
-    user = collection.find_one({'id': update.effective_user.id})
-    db.close_connection(mongo_client)
-    update.message.reply_text(f'Your canteen list is: {user["canteen_list"]}')
+    canteen_list = get_user_canteen_list_from_db(update.effective_user.id)
+    update.message.reply_text(f'Your canteen list is: {canteen_list}')
     logger.info(f"Got canteen list for user: {update.effective_user.username}")
 
 def add_canteen_to_user_list(update: Update, _: ContextTypes):
@@ -248,6 +253,14 @@ def canteen_time(update: Update, _: ContextTypes):
     update.message.reply_text(text)
 
 
+def my_canteens_menu(update: Update, context: ContextTypes):
+  logger.info(f"Getting favourite canteens menu for user: {update.effective_user.username}")
+  canteen_list = get_user_canteen_list_from_db(update.effective_user.id)
+  text = get_today_menu_string(canteen_names=canteen_list)
+  update.message.reply_text(text)
+  logger.info(f"Got favourite canteens menu for user: {update.effective_user.username}")
+
+
 def available_canteen_list(update: Update, _: ContextTypes):
     """
     Get canteen list
@@ -293,6 +306,7 @@ def bot_help(update: Update, _: ContextTypes):
     text += '/my_canteen_list - Get your canteen list\n'
     text += '/add_canteen - Add a canteen to your canteen list\n'
     text += '/remove_canteen - Remove a canteen from your canteen list\n'
+    text += '/my_canteen_menu - Get your canteen daily menu\n'
     text += '/canteen_time - Get specified canteen(s) time\n'
     text += '/available_canteen_list - Get the names of available canteens\n'
     text += '/credits - Get credits\n'
@@ -327,6 +341,7 @@ def set_handlers():
     dispatcher.add_handler(CommandHandler("my_canteen_list", get_user_canteen_list))
     dispatcher.add_handler(CommandHandler("add_canteen", add_canteen_to_user_list))
     dispatcher.add_handler(CommandHandler("remove_canteen", remove_canteen_from_user_list))
+    dispatcher.add_handler(CommandHandler("my_canteen_menu", my_canteens_menu))
     dispatcher.add_handler(CommandHandler("canteen_time", canteen_time))
     dispatcher.add_handler(CommandHandler("available_canteen_list", available_canteen_list))
     dispatcher.add_handler(CommandHandler("credits", bot_credits))

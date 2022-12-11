@@ -267,7 +267,8 @@ def init_menu():
         headers = {'Accept-Encoding': 'identity'}
         request = requests.get(url, headers=headers, timeout=60)
         if request.status_code == 200:
-            print("Canteen: ", canteen)
+            from bot import logger
+            logger.info(f"Getting info on canteen: {canteen}")
             menu, time = parse_menu(request.content.decode('utf-8'))
             if menu is not None and time is not None:
                 save_menu_to_db(menu, time, canteen)
