@@ -136,6 +136,8 @@ def get_today_menu_string(menu = None, canteen_names: List[str] = None) -> str:
                     text += f'\t\t\t{plate.title()}\n'
         else:
             text += '\tDinner: Closed\n'
+    if text == 'Today\'s menu:\n':
+        text = 'No menu available for the specified canteens'
     logger.info("Got today menu string")
     return text
 
@@ -270,6 +272,8 @@ def get_today_time_string(canteen_names: List[str] = None) -> str:
         canteen_names = [canteen.value for canteen in menu_module.Canteen]
     for canteen in canteen_names:
         canteen = get_canteen(canteen)
+        if canteen is None:
+            continue
         text += f'Canteen <b>{canteen["canteen"].title()}</b>:\n'
         if canteen['time']['Pranzo']['IsOpen']:
             text += f'\t<b>Lunch</b>: {canteen["time"]["Pranzo"]["OpenTime"]} - {canteen["time"]["Pranzo"]["CloseTime"]}\n'
@@ -279,6 +283,8 @@ def get_today_time_string(canteen_names: List[str] = None) -> str:
             text += f'\t<b>Dinner</b>: {canteen["time"]["Cena"]["OpenTime"]} - {canteen["time"]["Cena"]["CloseTime"]}\n'
         else:
             text += '\t<b>Dinner</b>: Closed\n'
+    if text == "":
+        text = "No valid canteens found"
     return text
 
 def canteen_time(update: Update, _: ContextTypes):
