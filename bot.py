@@ -58,7 +58,7 @@ def subscribe(update: Update, _: ContextTypes):
     data_base = db.get_data_base(mongo_client)
     collection = data_base[os.getenv('DB_USER_COLLECTION')]
     collection.update_one({'id':update.effective_user.id}, {'$set': {'send_daily_updates': True, 'canteen_list': []}})
-    update.message.reply_text(f'You have been subscribed to daily updates, {update.effective_user.first_name}!', parse_mode=ParseMode.HTML)
+    update.message.reply_text(f'You have been subscribed to daily updates, {update.effective_user.first_name}!\nPlease save your favourite canteen(s) to receive daily updates.\nTo do so, send /save_canteen_to_favourite followed by the names of your favourite canteens.', parse_mode=ParseMode.HTML)
     db.close_connection(mongo_client)
     logger.info("Subscribed user: %s", update.effective_user.username)
 
