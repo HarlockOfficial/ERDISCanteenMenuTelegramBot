@@ -168,6 +168,9 @@ def send_daily_updates(context: ContextTypes):
 
 
 def get_user_canteen_list_from_db(user_id):
+    """
+    Get user's canteen list from database
+    """
     mongo_client = db.open_connection()
     data_base = db.get_data_base(mongo_client)
     collection = data_base[os.getenv('DB_USER_COLLECTION')]
@@ -182,8 +185,20 @@ def get_user_canteen_list(update: Update, _: ContextTypes):
     """
     logger.info("Getting canteen list for user: %s", update.effective_user.username)
     canteen_list = get_user_canteen_list_from_db(update.effective_user.id)
-    update.message.reply_text(f'Your canteen list is: {canteen_list}', parse_mode=ParseMode.HTML)
+    update.message.reply_text(get_canteen_list_string(canteen_list), parse_mode=ParseMode.HTML)
     logger.info("Got canteen list for user: %s", update.effective_user.username)
+
+
+def get_canteen_list_string(canteen_list: List[str]) -> str:
+    """
+    Get canteen list as a string
+    """
+    logger.info("Getting canteen list string")
+    text = 'Canteen list:\n'
+    for canteen in canteen_list:
+        text += f'\t<b>{canteen.title()}</b>\n'
+    logger.info("Got canteen list string")
+    return text
 
 def add_canteen_to_user_list(update: Update, _: ContextTypes):
     """
@@ -200,11 +215,13 @@ def add_canteen_to_user_list(update: Update, _: ContextTypes):
     canteens_to_add = list(set(msg_content) - set(canteen_list))
     if len(canteens_to_add) <= 0:
         update.message.reply_text('No canteens added, please specify at least one', parse_mode=ParseMode.HTML)
+        db.close_connection(mongo_client)
+        logger.info("No canteens added to user: %s", update.effective_user.username)
         return
     canteen_list.extend(canteens_to_add)
     collection.update_one({'id': update.effective_user.id}, {'$set': {'canteen_list': canteen_list}})
     db.close_connection(mongo_client)
-    update.message.reply_text(f'Your canteen list is: {canteen_list}', parse_mode=ParseMode.HTML)
+    update.message.reply_text(get_canteen_list_string(canteen_list), parse_mode=ParseMode.HTML)
     logger.info("Added canteen list to user: %s", update.effective_user.username)
 
 
@@ -225,7 +242,7 @@ def remove_canteen_from_user_list(update: Update, _: ContextTypes):
     canteen_list = list(filter(lambda x: x.lower() not in [canteen.lower() for canteen in msg_content], canteen_list))
     collection.update_one({'id': update.effective_user.id}, {'$set': {'canteen_list': canteen_list}})
     db.close_connection(mongo_client)
-    update.message.reply_text(f'Your canteen list is: {canteen_list}', parse_mode=ParseMode.HTML)
+    update.message.reply_text(get_canteen_list_string(canteen_list), parse_mode=ParseMode.HTML)
     logger.info("Removed canteen list from user: %s", update.effective_user.username)
 
 
@@ -244,6 +261,9 @@ def get_canteen(canteen_name: str) -> dict:
 
 
 def get_today_time_string(canteen_names: List[str] = None) -> str:
+    """
+    Get today time string
+    """
     text = ""
     if canteen_names is None or len(canteen_names)<=0:
         text = "Since no canteen has been specified, here you have the full list\n"
@@ -302,10 +322,7 @@ def available_canteen_list(update: Update, _: ContextTypes):
     Get canteen list
     """
     logger.info("Getting available canteens for user: %s", update.effective_user.username)
-    text = 'Available Canteens names:\n'
-    for canteen in menu_module.Canteen:
-        text += f'\t{canteen.value}\n'
-    update.message.reply_text(text, parse_mode=ParseMode.HTML)
+    update.message.reply_text(get_canteen_list_string([canteen.value for canteen in menu_module.Canteen]), parse_mode=ParseMode.HTML)
     logger.info("Got available canteens for user: %s", update.effective_user.username)
 
 
