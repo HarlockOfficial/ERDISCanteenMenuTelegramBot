@@ -6,7 +6,7 @@ import datetime
 import logging
 from typing import List
 
-from telegram import Update
+from telegram import Update, ParseMode
 from telegram.ext import Updater, CommandHandler, MessageHandler, ContextTypes, Filters
 from dotenv import load_dotenv
 
@@ -42,9 +42,9 @@ def save_user(update: Update, _: ContextTypes):
             'send_daily_updates': False,
             'canteen_list': []
         })
-        update.message.reply_text(f'Hello, {update.effective_user.first_name}!')
+        update.message.reply_text(f'Hello, {update.effective_user.first_name}!', parse_mode=ParseMode.HTML)
     else:
-        update.message.reply_text(f'Hello again, {update.effective_user.first_name}!')
+        update.message.reply_text(f'Hello again, {update.effective_user.first_name}!', parse_mode=ParseMode.HTML)
     logger.info(f"Added user: {update.effective_user.username}")
     db.close_connection(mongo_client)
 
@@ -58,7 +58,7 @@ def subscribe(update: Update, _: ContextTypes):
     data_base = db.get_data_base(mongo_client)
     collection = data_base[os.getenv('DB_USER_COLLECTION')]
     collection.update_one({'id':update.effective_user.id}, {'$set': {'send_daily_updates': True, 'canteen_list': []}})
-    update.message.reply_text(f'You have been subscribed to daily updates, {update.effective_user.first_name}!')
+    update.message.reply_text(f'You have been subscribed to daily updates, {update.effective_user.first_name}!', parse_mode=ParseMode.HTML)
     db.close_connection(mongo_client)
     logger.info(f"Subscribed user: {update.effective_user.username}")
 
@@ -72,7 +72,7 @@ def unsubscribe(update: Update, _: ContextTypes):
     data_base = db.get_data_base(mongo_client)
     collection = data_base[os.getenv('DB_USER_COLLECTION')]
     collection.update_one({'id':update.effective_user.id}, {'$set': {'send_daily_updates': False, 'canteen_list': []}})
-    update.message.reply_text(f'You have been unsubscribed from daily updates, {update.effective_user.first_name}!')
+    update.message.reply_text(f'You have been unsubscribed from daily updates, {update.effective_user.first_name}!', parse_mode=ParseMode.HTML)
     db.close_connection(mongo_client)
     logger.info(f"Unsubscribed user: {update.effective_user.username}")
 
@@ -86,7 +86,7 @@ def delete_user(update: Update, _: ContextTypes):
     data_base = db.get_data_base(mongo_client)
     collection = data_base[os.getenv('DB_USER_COLLECTION')]
     collection.delete_one({'id': update.effective_user.id})
-    update.message.reply_text(f'Goodbye, {update.effective_user.first_name}!')
+    update.message.reply_text(f'Goodbye, {update.effective_user.first_name}!', parse_mode=ParseMode.HTML)
     db.close_connection(mongo_client)
     logger.info(f"Deleted user: {update.effective_user.username}")
 
@@ -119,13 +119,21 @@ def get_today_menu_string(menu = None, canteen_names: List[str] = None) -> str:
         menu = filter(lambda x: x['canteen'].lower() in [x.lower() for x in canteen_names], menu)
     text = 'Today\'s menu:\n'
     for item in menu:
-        text += f'{item["canteen"]}:\n'
+        text += f' Canteen <b>{item["canteen"].title()}</b>:\n'
         if item['time']['Pranzo']['IsOpen']:
-            text += f'\tLunch: {item["menu"]["Pranzo"]}\n'
+            text += f'\t<b>Lunch</b>:\n'
+            for course in item["menu"]["Pranzo"]:
+                text += f'\t\t<b>{course.title()}</b>:\n'
+                for plate in item['menu']['Pranzo'][course]:
+                    text += f'\t\t\t{plate.title()}\n'
         else:
-            text += '\tLunch: Closed\n'
+            text += '\t<b>Lunch</b>: Closed\n'
         if item['time']['Cena']['IsOpen']:
-            text += f'\tDinner: {item["menu"]["Cena"]}\n'
+            text += f'\t<b>Dinner</b>:\n'
+            for course in item["menu"]["Cena"]:
+                text += f'\t\t<b>{course}</b>:\n'
+                for plate in item['menu']['Cena'][course]:
+                    text += f'\t\t\t{plate.title()}\n'
         else:
             text += '\tDinner: Closed\n'
     logger.info("Got today menu string")
@@ -139,7 +147,7 @@ def today_menu(update: Update, _: ContextTypes):
     logger.info(f"Sending today menu to user: {update.effective_user.username}")
     msg_content = update.message.text.split(' ')
     text = get_today_menu_string(canteen_names=msg_content[1:])
-    update.message.reply_text(text)
+    update.message.reply_text(text, parse_mode=ParseMode.HTML)
     logger.info(f"Sent today menu to user: {update.effective_user.username}")
 
 
@@ -174,7 +182,7 @@ def get_user_canteen_list(update: Update, _: ContextTypes):
     """
     logger.info(f"Getting canteen list for user: {update.effective_user.username}")
     canteen_list = get_user_canteen_list_from_db(update.effective_user.id)
-    update.message.reply_text(f'Your canteen list is: {canteen_list}')
+    update.message.reply_text(f'Your canteen list is: {canteen_list}', parse_mode=ParseMode.HTML)
     logger.info(f"Got canteen list for user: {update.effective_user.username}")
 
 def add_canteen_to_user_list(update: Update, _: ContextTypes):
@@ -189,10 +197,14 @@ def add_canteen_to_user_list(update: Update, _: ContextTypes):
     canteen_list = user['canteen_list']
     msg_content = update.message.text.split(' ')
     msg_content = list(filter(lambda x: x.lower() in [canteen.value.lower() for canteen in menu_module.Canteen], [x.lower() for x in msg_content[1:]]))
-    canteen_list.extend(list(set(msg_content) - set(canteen_list)))
+    canteens_to_add = list(set(msg_content) - set(canteen_list))
+    if len(canteens_to_add) <= 0:
+      update.message.reply_text('No canteens added, please specify at least one', parse_mode=ParseMode.HTML)
+      return
+    canteen_list.extend(canteens_to_add)
     collection.update_one({'id': update.effective_user.id}, {'$set': {'canteen_list': canteen_list}})
     db.close_connection(mongo_client)
-    update.message.reply_text(f'Your canteen list is: {canteen_list}')
+    update.message.reply_text(f'Your canteen list is: {canteen_list}', parse_mode=ParseMode.HTML)
     logger.info(f"Added canteen list to user: {update.effective_user.username}")
 
 
@@ -206,11 +218,14 @@ def remove_canteen_from_user_list(update: Update, _: ContextTypes):
     collection = data_base[os.getenv('DB_USER_COLLECTION')]
     user = collection.find_one({'id': update.effective_user.id})
     canteen_list = user['canteen_list']
-    msg_content = update.message.text.split(' ')
-    canteen_list = list(filter(lambda x: x.lower() not in [canteen.lower() for canteen in msg_content[1:]], canteen_list))
+    msg_content = update.message.text.split(' ')[1:]
+    if len(msg_content) <= 0:
+        update.message.reply_text('No canteens removed, specify at least one canteen to remove', parse_mode=ParseMode.HTML)
+        return
+    canteen_list = list(filter(lambda x: x.lower() not in [canteen.lower() for canteen in msg_content], canteen_list))
     collection.update_one({'id': update.effective_user.id}, {'$set': {'canteen_list': canteen_list}})
     db.close_connection(mongo_client)
-    update.message.reply_text(f'Your canteen list is: {canteen_list}')
+    update.message.reply_text(f'Your canteen list is: {canteen_list}', parse_mode=ParseMode.HTML)
     logger.info(f"Removed canteen list from user: {update.effective_user.username}")
 
 
@@ -228,6 +243,24 @@ def get_canteen(canteen_name: str) -> dict:
     return canteen
 
 
+def get_today_time_string(canteen_names: List[str] = None) -> str:
+    text = ""
+    if canteen_names is None or len(canteen_names)<=0:
+        text = "Since no canteen has been specified, here you have the full list\n"
+        canteen_names = [canteen.value for canteen in menu_module.Canteen]
+    for canteen in canteen_names:
+        canteen = get_canteen(canteen)
+        text += f'Canteen <b>{canteen["canteen"].title()}</b>:\n'
+        if canteen['time']['Pranzo']['IsOpen']:
+            text += f'\t<b>Lunch</b>: {canteen["time"]["Pranzo"]["OpenTime"]} - {canteen["time"]["Pranzo"]["CloseTime"]}\n'
+        else:
+            text += '\t<b>Lunch</b>: Closed\n'
+        if canteen['time']['Cena']['IsOpen']:
+            text += f'\t<b>Dinner</b>: {canteen["time"]["Cena"]["OpenTime"]} - {canteen["time"]["Cena"]["CloseTime"]}\n'
+        else:
+            text += '\t<b>Dinner</b>: Closed\n'
+    return text
+
 def canteen_time(update: Update, _: ContextTypes):
     """
     Get canteen time
@@ -237,28 +270,24 @@ def canteen_time(update: Update, _: ContextTypes):
         msg_content = update.message.text.split(' ')
     except AttributeError:
         return
-    canteen_name_list = msg_content[1:]
-    for canteen in canteen_name_list:
-        canteen = get_canteen(canteen)
-        text = f'{canteen["canteen"]}:\n'
-        if canteen['time']['Pranzo']['IsOpen']:
-            text += f'\tLunch: {canteen["time"]["Pranzo"]["OpenTime"]} - {canteen["time"]["Pranzo"]["CloseTime"]}\n'
-        else:
-            text += '\tLunch: Closed\n'
-        if canteen['time']['Cena']['IsOpen']:
-            text += f'\tDinner: {canteen["time"]["Cena"]["OpenTime"]} - {canteen["time"]["Cena"]["CloseTime"]}\n'
-        else:
-            text += '\tDinner: Closed\n'
+    text = get_today_time_string(msg_content[1:])
     logger.info(f"Got canteen time for user: {update.effective_user.username}")
-    update.message.reply_text(text)
+    update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
 def my_canteens_menu(update: Update, context: ContextTypes):
   logger.info(f"Getting favourite canteens menu for user: {update.effective_user.username}")
   canteen_list = get_user_canteen_list_from_db(update.effective_user.id)
   text = get_today_menu_string(canteen_names=canteen_list)
-  update.message.reply_text(text)
+  update.message.reply_text(text, parse_mode=ParseMode.HTML)
   logger.info(f"Got favourite canteens menu for user: {update.effective_user.username}")
+
+def my_canteens_time(update: Update, context: ContextTypes):
+  logger.info(f"Getting favourite canteens time for user: {update.effective_user.username}")
+  canteen_list = get_user_canteen_list_from_db(update.effective_user.id)
+  text = get_today_time_string(canteen_names=canteen_list)
+  update.message.reply_text(text, parse_mode=ParseMode.HTML)
+  logger.info(f"Got favourite canteens time for user: {update.effective_user.username}")
 
 
 def available_canteen_list(update: Update, _: ContextTypes):
@@ -269,7 +298,7 @@ def available_canteen_list(update: Update, _: ContextTypes):
     text = 'Available Canteens names:\n'
     for canteen in menu_module.Canteen:
         text += f'\t{canteen.value}\n'
-    update.message.reply_text(text)
+    update.message.reply_text(text, parse_mode=ParseMode.HTML)
     logger.info(f"Got available canteens for user: {update.effective_user.username}")
 
 
@@ -288,7 +317,7 @@ def bot_credits(update: Update, _: ContextTypes):
     text += 'This bot is not affiliated with the University of Camerino nor the ERDIS Marche\n'
     text += 'The ERDIS Marche is not responsible for the content of this bot\n'
 
-    update.message.reply_text(text)
+    update.message.reply_text(text, parse_mode=ParseMode.HTML)
     logger.info(f"Sent credits to user: {update.effective_user.username}")
 
 
@@ -306,8 +335,9 @@ def bot_help(update: Update, _: ContextTypes):
     text += '/my_canteen_list - Get your canteen list\n'
     text += '/add_canteen - Add a canteen to your canteen list\n'
     text += '/remove_canteen - Remove a canteen from your canteen list\n'
-    text += '/my_canteen_menu - Get your canteen daily menu\n'
     text += '/canteen_time - Get specified canteen(s) time\n'
+    text += '/my_canteen_menu - Get your canteen(s) daily menu\n'
+    text += '/my_canteen_time - Get your canteen(s) time\n'
     text += '/available_canteen_list - Get the names of available canteens\n'
     text += '/credits - Get credits\n'
     text += '/help - Get help\n'
@@ -319,13 +349,13 @@ def bot_help(update: Update, _: ContextTypes):
     text += '\tThe following command will show canteen1 and canteen2 open and close time for lunch and dinner:\n'
     text += '\t\t/canteen_time canteen1 canteen2\n'
 
-    update.message.reply_text(text)
+    update.message.reply_text(text, parse_mode=ParseMode.HTML)
     logger.info(f"Sent help to user: {update.effective_user.username}")
 
 
 def unknown(update: Update, _: ContextTypes):
     logger.info(f"Received unknown command from user: {update.effective_user.username}")
-    update.message.reply_text("Sorry, I didn't understand.")
+    update.message.reply_text("Sorry, I didn't understand.", parse_mode=ParseMode.HTML)
 
 
 def set_handlers():
@@ -341,8 +371,9 @@ def set_handlers():
     dispatcher.add_handler(CommandHandler("my_canteen_list", get_user_canteen_list))
     dispatcher.add_handler(CommandHandler("add_canteen", add_canteen_to_user_list))
     dispatcher.add_handler(CommandHandler("remove_canteen", remove_canteen_from_user_list))
-    dispatcher.add_handler(CommandHandler("my_canteen_menu", my_canteens_menu))
     dispatcher.add_handler(CommandHandler("canteen_time", canteen_time))
+    dispatcher.add_handler(CommandHandler("my_canteen_menu", my_canteens_menu))
+    dispatcher.add_handler(CommandHandler("my_canteen_time", my_canteens_time))  
     dispatcher.add_handler(CommandHandler("available_canteen_list", available_canteen_list))
     dispatcher.add_handler(CommandHandler("credits", bot_credits))
     dispatcher.add_handler(CommandHandler("help", bot_help))
