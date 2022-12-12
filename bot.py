@@ -108,7 +108,7 @@ def get_today_menu():
     return menu
 
 
-def get_today_menu_string(menu = None, canteen_names: List[str] = None) -> str:
+def get_today_menu_string(menu = None, canteen_names: List[str] = None) -> List[str]:
     """
     Get today's menu as a string
     """
@@ -117,27 +117,28 @@ def get_today_menu_string(menu = None, canteen_names: List[str] = None) -> str:
         menu = get_today_menu()
     if canteen_names is not None and len(canteen_names) > 0:
         menu = filter(lambda x: x['canteen'].lower() in [x.lower() for x in canteen_names], menu)
-    text = 'Today\'s menu:\n'
+    text = ['Today\'s menu:\n']
     for item in menu:
-        text += f' Canteen <b>{item["canteen"].title()}</b>:\n'
+        tmp_text = f' Canteen <b>{item["canteen"].title()}</b>:\n'
         if item['time']['Pranzo']['IsOpen']:
-            text += '\t<b>Lunch</b>:\n'
+            tmp_text += '\t<b>Lunch</b>:\n'
             for course in item["menu"]["Pranzo"]:
-                text += f'\t\t<b>{course.title()}</b>:\n'
+                tmp_text += f'\t\t<b>{course.title()}</b>:\n'
                 for plate in item['menu']['Pranzo'][course]:
-                    text += f'\t\t\t{plate.title()}\n'
+                    tmp_text += f'\t\t\t{plate.title()}\n'
         else:
-            text += '\t<b>Lunch</b>: Closed\n'
+            tmp_text += '\t<b>Lunch</b>: Closed\n'
         if item['time']['Cena']['IsOpen']:
-            text += '\t<b>Dinner</b>:\n'
+            tmp_text += '\t<b>Dinner</b>:\n'
             for course in item["menu"]["Cena"]:
-                text += f'\t\t<b>{course}</b>:\n'
+                tmp_text += f'\t\t<b>{course}</b>:\n'
                 for plate in item['menu']['Cena'][course]:
-                    text += f'\t\t\t{plate.title()}\n'
+                    tmp_text += f'\t\t\t{plate.title()}\n'
         else:
-            text += '\tDinner: Closed\n'
-    if text == 'Today\'s menu:\n':
-        text = 'No menu available for the specified canteens'
+            tmp_text += '\tDinner: Closed\n'
+        text.append(tmp_text)
+    if len(text) <= 1:
+        text = ['No menu available for the specified canteens']
     logger.info("Got today menu string")
     return text
 
@@ -149,7 +150,8 @@ def today_menu(update: Update, _: ContextTypes):
     logger.info("Sending today menu to user: %s", update.effective_user.username)
     msg_content = update.message.text.split(' ')
     text = get_today_menu_string(canteen_names=msg_content[1:])
-    update.message.reply_text(text, parse_mode=ParseMode.HTML)
+    for msg in text:
+        update.message.reply_text(text=msg, parse_mode=ParseMode.HTML)
     logger.info("Sent today menu to user: %s", update.effective_user.username)
 
 
@@ -165,7 +167,8 @@ def send_daily_updates(context: ContextTypes):
     db.close_connection(mongo_client)
     for user in users:
         menu = get_today_menu_string(canteen_names=user['canteen_list'])
-        context.bot.send_message(chat_id=user['chat_id'], text=menu)
+        for msg in menu:
+            context.bot.send_message(chat_id=user['chat_id'], text=msg, parse_mode=ParseMode.HTML)
     logger.info('Completed sending daily updates')
 
 
@@ -270,21 +273,23 @@ def get_today_time_string(canteen_names: List[str] = None) -> str:
     if canteen_names is None or len(canteen_names)<=0:
         text = "Since no canteen has been specified, here you have the full list\n"
         canteen_names = [canteen.value for canteen in menu_module.Canteen]
+    text = []
     for canteen in canteen_names:
         canteen = get_canteen(canteen)
         if canteen is None:
             continue
-        text += f'Canteen <b>{canteen["canteen"].title()}</b>:\n'
+        tmp_text = f'Canteen <b>{canteen["canteen"].title()}</b>:\n'
         if canteen['time']['Pranzo']['IsOpen']:
-            text += f'\t<b>Lunch</b>: {canteen["time"]["Pranzo"]["OpenTime"]} - {canteen["time"]["Pranzo"]["CloseTime"]}\n'
+            tmp_text += f'\t<b>Lunch</b>: {canteen["time"]["Pranzo"]["OpenTime"]} - {canteen["time"]["Pranzo"]["CloseTime"]}\n'
         else:
-            text += '\t<b>Lunch</b>: Closed\n'
+            tmp_text += '\t<b>Lunch</b>: Closed\n'
         if canteen['time']['Cena']['IsOpen']:
-            text += f'\t<b>Dinner</b>: {canteen["time"]["Cena"]["OpenTime"]} - {canteen["time"]["Cena"]["CloseTime"]}\n'
+            tmp_text += f'\t<b>Dinner</b>: {canteen["time"]["Cena"]["OpenTime"]} - {canteen["time"]["Cena"]["CloseTime"]}\n'
         else:
-            text += '\t<b>Dinner</b>: Closed\n'
-    if text == "":
-        text = "No valid canteens found"
+            tmp_text += '\t<b>Dinner</b>: Closed\n'
+        text.append(tmp_text)
+    if len(text)<=0:
+        text = ["No valid canteens found"]
     return text
 
 def canteen_time(update: Update, _: ContextTypes):
@@ -297,8 +302,9 @@ def canteen_time(update: Update, _: ContextTypes):
     except AttributeError:
         return
     text = get_today_time_string(msg_content[1:])
+    for msg in text:
+        update.message.reply_text(text=msg, parse_mode=ParseMode.HTML)
     logger.info("Got canteen time for user: %s", update.effective_user.username)
-    update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
 def my_canteens_menu(update: Update, _: ContextTypes):
@@ -308,7 +314,8 @@ def my_canteens_menu(update: Update, _: ContextTypes):
     logger.info("Getting favourite canteens menu for user: %s", update.effective_user.username)
     canteen_list = get_user_canteen_list_from_db(update.effective_user.id)
     text = get_today_menu_string(canteen_names=canteen_list)
-    update.message.reply_text(text, parse_mode=ParseMode.HTML)
+    for msg in text:
+        update.message.reply_text(text=msg, parse_mode=ParseMode.HTML)
     logger.info("Got favourite canteens menu for user: %s", update.effective_user.username)
 
 
@@ -319,7 +326,8 @@ def my_canteens_time(update: Update, _: ContextTypes):
     logger.info("Getting favourite canteens time for user: %s", update.effective_user.username)
     canteen_list = get_user_canteen_list_from_db(update.effective_user.id)
     text = get_today_time_string(canteen_names=canteen_list)
-    update.message.reply_text(text, parse_mode=ParseMode.HTML)
+    for msg in text:
+        update.message.reply_text(text=msg, parse_mode=ParseMode.HTML)
     logger.info("Got favourite canteens time for user: %s", update.effective_user.username)
 
 
