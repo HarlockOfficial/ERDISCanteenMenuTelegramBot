@@ -379,6 +379,7 @@ def bot_help(update: Update, _: ContextTypes):
     text += '/available_canteen_list - Get the names of available canteens\n'
     text += '/credits - Get credits\n'
     text += '/help - Shows this message\n'
+    text += '/restart - Updates the bot source code from the related github branch, then restarts it'
     text += 'Example:\n'
     text += '\tThe following command will send you today\'s menu for canteen1 and canteen2:\n'
     text += '\t\t/menu canteen1 canteen2\n'
@@ -397,6 +398,18 @@ def unknown(update: Update, _: ContextTypes):
     """
     logger.info("Received unknown command from user: %s", update.effective_user.username)
     update.message.reply_text("Sorry, I didn't understand.", parse_mode=ParseMode.HTML)
+
+
+def restart(update: Update, _: ContextTypes):
+  logger.info("Restarting the bot")
+  import git
+  g = git.cmd.Git('./')
+  g.pull()
+  logger.info("finished pulling updates")
+  logger.info("killing bot")
+  import os
+  import signal
+  os.kill(os.getpid(), signal.SIGINT)
 
 
 def set_handlers():
@@ -418,6 +431,7 @@ def set_handlers():
     dispatcher.add_handler(CommandHandler("available_canteen_list", available_canteen_list))
     dispatcher.add_handler(CommandHandler("credits", bot_credits))
     dispatcher.add_handler(CommandHandler("help", bot_help))
+    dispatcher.add_handler(CommandHandler("restart", restart))
     dispatcher.add_handler(MessageHandler(Filters.command | Filters.text, unknown))
     logger.info("Set handlers")
 

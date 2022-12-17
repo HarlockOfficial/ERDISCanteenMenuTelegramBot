@@ -1,7 +1,7 @@
-
+run = "bash run.sh"
 # The primary language of the repl. There can be others, though!
-language = "python3"
-entrypoint = "bot.py"
+# language = "python"
+# entrypoint = "bot.py"
 # A list of globs that specify which files and directories should
 # be hidden in the workspace.
 hidden = ["venv", ".config", "**/__pycache__", "**/.mypy_cache", "**/*.pyc"]
@@ -11,18 +11,18 @@ hidden = ["venv", ".config", "**/__pycache__", "**/.mypy_cache", "**/*.pyc"]
 channel = "stable-21_11"
 
 # The command to start the interpreter.
-[interpreter]
-  [interpreter.command]
-  args = [
-    "stderred",
-    "--",
-    "prybar-python3",
-    "-q",
-    "--ps1",
-    "\u0001\u001b[33m\u0002\u0001\u001b[00m\u0002 ",
-    "-i",
-  ]
-  env = { LD_LIBRARY_PATH = "$PYTHON_LD_LIBRARY_PATH" }
+#[interpreter]
+#  [interpreter.command]
+#  args = [
+#    "stderred",
+#    "--",
+#    "prybar-python3",
+#    "-q",
+#    "--ps1",
+#    "\u0001\u001b[33m\u0002\u0001\u001b[00m\u0002 ",
+#    "-i",
+#  ]
+#  env = { LD_LIBRARY_PATH = "$PYTHON_LD_LIBRARY_PATH" }
 
 [env]
 VIRTUAL_ENV = "/home/runner/${REPL_SLUG}/venv"
